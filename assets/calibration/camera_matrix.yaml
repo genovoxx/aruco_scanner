@@ -1,0 +1,16 @@
+# Beispiel-Kamera-Kalibrierungsmatrix
+# Diese Werte sind Beispiele und müssen durch echte Kalibrierungsdaten ersetzt werden
+# Kalibrierung kann mit OpenCV's cv2.calibrateCamera() durchgeführt werden
+
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [
+    800.0, 0.0, 320.0,
+    0.0, 800.0, 240.0,
+    0.0, 0.0, 1.0
+  ]
+
+# Beispiel für eine 640x480 Kamera
+# fx = fy = 800 (Brennweite in Pixeln)
+# cx = 320, cy = 240 (Bildmittelpunkt)

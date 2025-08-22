@@ -1,0 +1,11 @@
+# Beispiel-Verzerrungskoeffizienten
+# Diese Werte sind Beispiele und müssen durch echte Kalibrierungsdaten ersetzt werden
+
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.1, -0.2, 0.0, 0.0, 0.1]
+
+# k1, k2 = radiale Verzerrung
+# p1, p2 = tangentiale Verzerrung  
+# k3 = weitere radiale Verzerrung
