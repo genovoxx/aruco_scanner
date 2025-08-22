@@ -1,15 +1,16 @@
 # ArUco Scanner - Flutter App mit opencv_dart
 
-Eine Flutter-Demo-App für ArUco-Marker-Erkennung in Echtzeit mit `opencv_dart`.
+Eine Flutter-App für ArUco-Marker-Erkennung durch manuelle Bildaufnahme mit `opencv_dart`.
 
 ## Funktionen
 
 - ✅ **Kamera-Preview** in Echtzeit
-- ✅ **ArUco-Marker-Erkennung** mit opencv_dart
+- ✅ **Shot-basierte ArUco-Marker-Erkennung** mit opencv_dart
+- ✅ **Manuelle Bildaufnahme** - Erkennung nur bei Button-Druck
 - ✅ **Mehrere Dictionary-Typen** (DICT_4X4_50, DICT_5X5_100, etc.)
 - ✅ **Performance-Einstellungen** (Schnell, Ausgewogen, Qualität)
 - ✅ **Visuelles Overlay** mit Marker-IDs und Eckpunkten
-- ✅ **FPS-Anzeige** und Live-Status
+- ✅ **Clear-Funktion** zum Löschen alter Erkennungen
 - ✅ **Settings-Panel** zur Laufzeit-Konfiguration
 - 🚧 **Pose-Schätzung** (vorbereitet, benötigt Kalibrierung)
 
@@ -51,7 +52,8 @@ flutter run
 ```
 
 **Mindestanforderungen:**
-- minSdkVersion: 21
+- minSdk: 24 (Android 7.0+) - erforderlich für opencv_dart
+- compileSdk: 36 - für aktuelle Camera-Plugins
 - Kamera-Berechtigung automatisch konfiguriert
 
 ### iOS
@@ -75,17 +77,22 @@ flutter run
 - Warten bis Kamera initialisiert ist
 
 ### 2. ArUco-Marker erkennen
-- Marker vor die Kamera halten
+- **"ArUco scannen"-Button** drücken um ein Foto aufzunehmen
+- Marker vor die Kamera halten und Button drücken
 - Erkannte Marker werden mit grünen Rahmen und IDs angezeigt
-- Status-Bar zeigt Anzahl erkannter Marker
+- Status-Bar zeigt Anzahl erkannter Marker der letzten Aufnahme
 
-### 3. Einstellungen anpassen
+### 3. Weitere Aufnahmen
+- **Roten Clear-Button** drücken um alte Erkennungen zu löschen
+- **"ArUco scannen"** erneut drücken für neue Erkennung
+- Buttons sind immer über dem Overlay sichtbar und klickbar
+
+### 4. Einstellungen anpassen
 - **Settings-Button** (⚙️) in der AppBar
 - **Dictionary wechseln:** verschiedene ArUco-Typen testen
 - **Performance:** Schnell/Ausgewogen/Qualität
-- **FPS-Limit:** 10-60 FPS einstellen
 
-### 4. Demo-Marker erstellen
+### 5. Demo-Marker erstellen
 
 Zum Testen können ArUco-Marker online generiert werden:
 
@@ -125,29 +132,42 @@ lib/
 
 ### Performance-Optimierungen
 
-- **FPS-Limiting:** Verhindert UI-Blockierung
-- **Async-Processing:** Nutzt opencv_dart async APIs
-- **Downscaling:** Reduziert Verarbeitungszeit
-- **Graustufen:** Nur Y-Plane von YUV420
+- **Shot-basierte Verarbeitung:** Vermeidet kontinuierliche CPU-Last
+- **JPEG/PNG-Dekodierung:** Nutzt opencv_dart `imdecode()` für aufgenommene Bilder
+- **Graustufen-Konvertierung:** Nur für ArUco-Erkennung
+- **Speicher-Management:** Automatisches `dispose()` von OpenCV-Objekten
 
-### Kamera-Pipeline
+### Kamera-Pipeline (Shot-basiert)
 
-1. **CameraController** → `startImageStream()`
-2. **CameraImage** (YUV420) → Y-Plane Extraktion
-3. **cv.Mat** → ArUco-Erkennung
-4. **Ergebnisse** → UI-Overlay Mapping
-5. **Preview-Koordinaten** → Korrekte Darstellung
+1. **CameraController** → `takePicture()` bei Button-Druck
+2. **XFile** → Bild als Bytes laden
+3. **cv.imdecode()** → JPEG/PNG zu cv.Mat
+4. **cv.cvtColor()** → Graustufen-Konvertierung
+5. **cv.ArucoDetector.detectMarkers()** → Marker-Erkennung
+6. **Koordinaten-Mapping** → UI-Overlay
+7. **Mat.dispose()** → Speicher freigeben
 
 ## Bekannte Limitierungen
 
-### Demo-Implementation
+### Shot-basierte Erkennung
 
-Die aktuelle Version verwendet eine **Demo-Implementierung** für die Marker-Erkennung, da die exakte opencv_dart API für CameraImage-zu-Mat-Konvertierung projektspezifisch implementiert werden muss.
+Die App verwendet jetzt eine **Shot-basierte Implementierung** anstatt kontinuierlicher Echtzeit-Erkennung:
 
-**Echte Implementierung benötigt:**
-- YUV420 → cv.Mat Konvertierung
-- Korrekte Speicher-Management
-- Platform-spezifische Optimierungen
+**Vorteile:**
+- ✅ Deutlich weniger CPU-Last und Akku-Verbrauch
+- ✅ Stabile Marker-Anzeige ohne Flackern
+- ✅ Präzise Erkennung durch scharfe Standbilder
+- ✅ Keine komplexe YUV420-zu-Mat-Konvertierung nötig
+
+**Einschränkungen:**
+- ❌ Keine Echtzeit-Verfolgung von Markern
+- ❌ Manuelle Auslösung für jede Erkennung erforderlich
+
+### UI-Interaktion
+
+- **Overlay-Positionierung:** ArUco-Overlay ist mit `IgnorePointer` versehen
+- **Button-Priorität:** Scan- und Clear-Buttons sind immer oberste Stack-Ebene
+- **Touch-Events:** Werden korrekt an Buttons weitergeleitet
 
 ### Pose-Schätzung
 
@@ -157,33 +177,42 @@ Die aktuelle Version verwendet eine **Demo-Implementierung** für die Marker-Erk
 
 ## Erweitern der App
 
-### Echte OpenCV-Integration
+### Rückwechsel zu Echtzeit-Erkennung
 
-1. **YUV-Konvertierung implementieren:**
+Falls kontinuierliche Erkennung gewünscht ist:
+
+1. **CameraImage-Stream implementieren:**
    ```dart
-   cv.Mat yuvToMat(CameraImage image) {
-     // Siehe image_converter_example.dart
+   _controller.startImageStream(_processImage);
+   ```
+
+2. **YUV420-zu-Mat-Konvertierung:**
+   ```dart
+   cv.Mat cameraImageToMat(CameraImage image) {
+     // Siehe cv_camera_converters.dart Beispiele
    }
    ```
 
-2. **Kalibrierung hinzufügen:**
-   ```yaml
-   # assets/calibration/camera_matrix.yaml
-   camera_matrix: [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
-   dist_coeffs: [k1, k2, p1, p2, k3]
+3. **FPS-Limiting hinzufügen:**
+   ```dart
+   Timer.periodic(Duration(milliseconds: 100), (timer) {
+     // Verarbeitung alle 100ms
+   });
    ```
 
-3. **Pose-Rendering aktivieren:**
-   ```dart
-   _showPose = true; // in main.dart
-   ```
+### Shot-Verbesserungen
+
+- **Burst-Modus:** Mehrere Bilder schnell hintereinander
+- **Autofokus:** Vor Aufnahme fokussieren
+- **Belichtungsoptimierung:** Für bessere Marker-Erkennung
+- **Vorschau-Feedback:** Marker-Hinweise vor Aufnahme
 
 ### Weitere Features
 
-- **Marker-Tracking:** ID-basierte Persistenz
-- **Multi-Marker-Boards:** Komplexe Szenen
-- **Augmented Reality:** 3D-Objekte über Marker
-- **Kalibrierungs-Tool:** Automatische Kamera-Kalibrierung
+- **Marker-Historie:** Alle erkannten Marker speichern
+- **Batch-Verarbeitung:** Mehrere Bilder aus Galerie
+- **Export-Funktion:** Erkennungen als JSON/CSV
+- **Augmented Reality:** 3D-Objekte über Marker (mit Echtzeit-Modus)
 
 ## Troubleshooting
 
@@ -200,14 +229,21 @@ Die aktuelle Version verwendet eine **Demo-Implementierung** für die Marker-Erk
 
 ### Performance-Probleme
 
-**Niedrige FPS:**
+**App zu langsam:**
 - Performance auf "Schnell" setzen
-- Downscale-Faktor reduzieren (0.5 → 0.3)
-- FPS-Limit erhöhen
+- Kleinere ArUco-Marker verwenden (weniger Verarbeitungszeit)
+- Bessere Beleuchtung für schärfere Bilder
 
-**App-Crash:**
-- Memory-Leaks durch fehlende dispose() Aufrufe
-- OpenCV Mat-Objekte nicht freigegeben
+**Button nicht klickbar:**
+- ArUco-Overlay ist mit `IgnorePointer` versehen
+- Stack-Reihenfolge prüfen (Buttons müssen oberste Ebene sein)
+- UI-Refresh durch Settings-Toggle testen
+
+**Marker nicht erkannt:**
+- Marker gerade und gut beleuchtet halten
+- Richtiges Dictionary wählen (4x4 für IDs 0-49)
+- Marker-Größe: mindestens 3x3 cm
+- Scharfes Foto durch ruhige Hand
 
 ## Lizenz
 
